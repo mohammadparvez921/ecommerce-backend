@@ -213,6 +213,34 @@ app.delete('/deleteproduct', async (req, res) => {
 });
 
 
+
+// Get product by name
+app.get('/products/:productName', async (req, res) => {
+  const productName = req.params.productName;
+
+  try {
+    const session = driver.session();
+
+    const result = await session.run(
+      'MATCH (p:Product {productName: $productName}) RETURN p',
+      { productName }
+    );
+
+    session.close();
+
+    if (result.records.length === 0) {
+      res.status(404).json({ error: 'Product not found' });
+    } else {
+      const product = result.records[0].get('p').properties;
+      res.json(product);
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch product' });
+  }
+});
+
+
 app.listen(3002, function () {
   console.log('Server started');
 });
