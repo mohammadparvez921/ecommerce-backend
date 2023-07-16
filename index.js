@@ -127,6 +127,30 @@ app.post('/login', async (req, res) => {
 });
 
 
+
+// Add product endpoint
+app.post('/products', async (req, res) => {
+  const { productName, description, category, price } = req.body;
+
+  try {
+    const session = driver.session();
+
+    // Create a new product node in Neo4j
+    const result = await session.run(
+      'CREATE (product:Product {productName: $productName, description: $description, category: $category, price: $price}) RETURN product',
+      { productName, description, category, price }
+    );
+
+    session.close();
+
+    // Return the created product
+    res.json(result.records[0].get('product'));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to add product' });
+  }
+});
+
 app.get("/message", (req, res) => {
 
   res.status(200).send({ message: "Hello from server!" });
