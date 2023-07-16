@@ -8,14 +8,15 @@ const cors = require("cors");
 const app = express();
 
 // app.use(cors());
-app.use(cors (
-  
-  {origin:"http://localhost:3000",
-  credentials:true,
+app.use(cors(
+
+  {
+    origin: "http://localhost:3000",
+    credentials: true,
   }
 ))
 app.use((_req, res, next) => {
-  res.header('Access-Control-Allow-Origin',"http://localhost:3000");
+  res.header('Access-Control-Allow-Origin', "http://localhost:3000");
   res.header('Access-Control-Allow-Headers', '*');
 
   next();
@@ -59,7 +60,7 @@ let driver
 // signup endpoint
 
 app.post('/signup', async (req, res) => {
-  const { username, password,email } = req.body;
+  const { username, password, email } = req.body;
 
   try {
     const session = driver.session();
@@ -78,7 +79,7 @@ app.post('/signup', async (req, res) => {
     // Create a new user node in Neo4j
     const result = await session.run(
       'CREATE (user:User {username: $username, password: $password,email:$email}) RETURN user',
-      { username, password,email }
+      { username, password, email }
     );
 
     session.close();
@@ -157,7 +158,7 @@ app.get('/allproducts', async (req, res) => {
   try {
     const session = driver.session();
 
-   
+
     const result = await session.run('MATCH (product:Product) RETURN product');
 
     session.close();
@@ -172,15 +173,45 @@ app.get('/allproducts', async (req, res) => {
   }
 });
 
+// Delete a product
+app.delete('/products/:id', async (req, res) => {
+  const productId = req.params.id;
 
+  try {
+    const session = driver.session();
 
+    // Delete the product node in Neo4j based on the given ID
+    await session.run('MATCH (product:Product {id: $productId}) DELETE product', { productId });
 
+    session.close();
 
-
-app.get("/message", (req, res) => {
-
-  res.status(200).send({ message: "Hello from server!" });
+    res.sendStatus(200);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete product' });
+  }
 });
+
+
+// Delete a product by name
+app.delete('/deleteproduct', async (req, res) => {
+  const { productName } = req.body;
+
+  try {
+    const session = driver.session();
+
+    // Delete the product node in Neo4j based on the given product name
+    await session.run('MATCH (product:Product {productName: $productName}) DELETE product', { productName });
+
+    session.close();
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete product' });
+  }
+});
+
 
 app.listen(3002, function () {
   console.log('Server started');
