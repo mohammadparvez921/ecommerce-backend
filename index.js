@@ -56,16 +56,29 @@ let driver
 })();
 
 
+// signup endpoint
+
 app.post('/signup', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password,email } = req.body;
 
   try {
     const session = driver.session();
 
+
+    const emailCheckResult = await session.run(
+      'MATCH (user:User {email: $email}) RETURN user',
+      { email }
+    );
+
+    if (emailCheckResult.records.length > 0) {
+      session.close();
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
     // Create a new user node in Neo4j
     const result = await session.run(
-      'CREATE (user:User {username: $username, password: $password}) RETURN user',
-      { username, password }
+      'CREATE (user:User {username: $username, password: $password,email:$email}) RETURN user',
+      { username, password,email }
     );
 
     session.close();
@@ -77,6 +90,42 @@ app.post('/signup', async (req, res) => {
     res.status(500).json({ error: 'Failed to signup' });
   }
 });
+
+
+// login endpoit
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const session = driver.session();
+
+    // Check if user exists and password matches
+    const result = await session.run(
+      `
+      MATCH (user:User {email: $email})
+      RETURN user.password = $password AS passwordMatch
+      `,
+      {
+        email,
+        password,
+      }
+    );
+
+    session.close();
+
+    if (result.records[0].get('passwordMatch')) {
+      // Authentication successful
+      res.json({ success: true });
+    } else {
+      // Authentication failed
+      res.json({ success: false, error: 'Invalid credentials' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to login' });
+  }
+});
+
 
 app.get("/message", (req, res) => {
 
