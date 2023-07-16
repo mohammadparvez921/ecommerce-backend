@@ -151,6 +151,32 @@ app.post('/products', async (req, res) => {
   }
 });
 
+
+// Get all products
+app.get('/allproducts', async (req, res) => {
+  try {
+    const session = driver.session();
+
+   
+    const result = await session.run('MATCH (product:Product) RETURN product');
+
+    session.close();
+
+    // Map the Neo4j result to JSON format
+    const products = result.records.map((record) => record.get('product').properties);
+
+    res.json(products);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+
+
+
+
+
 app.get("/message", (req, res) => {
 
   res.status(200).send({ message: "Hello from server!" });
