@@ -244,7 +244,7 @@ app.put('/updateproduct/:productName', async (req, res) => {
 // Filter products by category endpoint
 app.get('/searchproducts/:category', async (req, res) => {
   const { category } = req.params;
-
+    console.log(category);
   try {
     const session = driver.session();
 
@@ -261,6 +261,39 @@ app.get('/searchproducts/:category', async (req, res) => {
 
     // Map the Neo4j result to JSON format
     const products = result.records.map((record) => record.get('p'));
+
+    res.json(products);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+
+
+// code for sorting 
+app.get('/sortingproducts/:email', async (req, res) => {
+  const { email } = req.params;
+
+  try {
+    const session = driver.session();
+
+    // Filter products by email ID of the vendor
+    const result = await session.run(
+      `
+      MATCH (v:Vendor {email: $email})-[:SELLS]->(p:Product)
+      RETURN p
+      `,
+      { email }
+    );
+
+    session.close();
+
+    // Map the Neo4j result to JSON format
+    const products = result.records.map((record) => record.get('p'));
+
+    // Sort products by price in ascending order
+    products.sort((a, b) => a.properties.price - b.properties.price);
 
     res.json(products);
   } catch (error) {
