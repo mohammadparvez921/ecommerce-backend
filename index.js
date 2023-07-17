@@ -67,7 +67,7 @@ app.post('/signup', async (req, res) => {
 
 
     const emailCheckResult = await session.run(
-      'MATCH (user:User {email: $email}) RETURN user',
+      'MATCH (v:Vendor {email: $email}) RETURN v',
       { email }
     );
 
@@ -78,14 +78,14 @@ app.post('/signup', async (req, res) => {
 
     // Create a new user node in Neo4j
     const result = await session.run(
-      'CREATE (user:User {username: $username, password: $password,email:$email}) RETURN user',
+      'CREATE (v:Vendor {username: $username, password: $password,email:$email}) RETURN v',
       { username, password, email }
     );
 
     session.close();
 
     // Return the created user
-    res.json(result.records[0].get('user'));
+    res.json(result.records[0].get('v'));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to signup' });
@@ -103,8 +103,8 @@ app.post('/login', async (req, res) => {
     // Check if user exists and password matches
     const result = await session.run(
       `
-      MATCH (user:User {email: $email})
-      RETURN user.password = $password AS passwordMatch
+      MATCH (v:Vendor {email: $email})
+      RETURN v.password = $password AS passwordMatch
       `,
       {
         email,
@@ -130,22 +130,29 @@ app.post('/login', async (req, res) => {
 
 
 // Add product endpoint
-app.post('/products', async (req, res) => {
+app.post('/addproducts/:emailid', async (req, res) => {
   const { productName, description, category, price } = req.body;
+  const emailid = req.params.emailid;
 
   try {
     const session = driver.session();
 
     // Create a new product node in Neo4j
     const result = await session.run(
-      'CREATE (product:Product {productName: $productName, description: $description, category: $category, price: $price}) RETURN product',
-      { productName, description, category, price }
+      // 'CREATE (product:Product {productName: $productName, description: $description, category: $category, price: $price}) RETURN product',
+      `
+      MATCH (v:Vendor {email: $emailid})
+      CREATE (p:Product {productName: $productName, description:$description, category: $category , price: $price})
+      CREATE (v)-[:SELLS]->(p)
+      RETURN v,p
+      `,
+      { emailid, productName,description,category,price}
     );
 
     session.close();
 
     // Return the created product
-    res.json(result.records[0].get('product'));
+    res.json(result.records[0].get('p'));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to add product' });
@@ -154,17 +161,23 @@ app.post('/products', async (req, res) => {
 
 
 // Get all products
-app.get('/allproducts', async (req, res) => {
+app.get('/allproducts/:emailid', async (req, res) => {
   try {
     const session = driver.session();
+    const emailid = req.params.emailid;
 
-
-    const result = await session.run('MATCH (product:Product) RETURN product');
+    const result = await session.run(
+      `
+      MATCH (v:Vendor {email: $emailid})-[:SELLS]->(p:Product)
+      RETURN p
+      `,
+      { emailid }
+    );
 
     session.close();
 
     // Map the Neo4j result to JSON format
-    const products = result.records.map((record) => record.get('product').properties);
+    const products = result.records.map((record) => record.get('p'));
 
     res.json(products);
   } catch (error) {
@@ -173,24 +186,7 @@ app.get('/allproducts', async (req, res) => {
   }
 });
 
-// Delete a product
-app.delete('/products/:id', async (req, res) => {
-  const productId = req.params.id;
 
-  try {
-    const session = driver.session();
-
-    // Delete the product node in Neo4j based on the given ID
-    await session.run('MATCH (product:Product {id: $productId}) DELETE product', { productId });
-
-    session.close();
-
-    res.sendStatus(200);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to delete product' });
-  }
-});
 
 
 // Delete a product by name
@@ -201,7 +197,10 @@ app.delete('/deleteproduct', async (req, res) => {
     const session = driver.session();
 
     // Delete the product node in Neo4j based on the given product name
-    await session.run('MATCH (product:Product {productName: $productName}) DELETE product', { productName });
+     await session.run(
+      'MATCH (v)-[s:SELLS]->(p:Product {productName: $productName}) DELETE s, p',
+      { productName }
+    );
 
     session.close();
 
@@ -213,32 +212,35 @@ app.delete('/deleteproduct', async (req, res) => {
 });
 
 
-
-// Get product by name
-app.get('/products/:productName', async (req, res) => {
-  const productName = req.params.productName;
+// Update product endpoint
+app.put('/updateproduct/:productName', async (req, res) => {
+  const { productName } = req.params;
+  const { description, category, price } = req.body;
 
   try {
     const session = driver.session();
 
+    // Update the product information in Neo4j
     const result = await session.run(
-      'MATCH (p:Product {productName: $productName}) RETURN p',
-      { productName }
+      `
+      MATCH (p:Product {productName: $productName})
+      SET p.description = $description, p.category = $category, p.price = $price
+      RETURN p
+      `,
+      { productName, description, category, price }
     );
 
     session.close();
 
-    if (result.records.length === 0) {
-      res.status(404).json({ error: 'Product not found' });
-    } else {
-      const product = result.records[0].get('p').properties;
-      res.json(product);
-    }
+    // Return the updated product
+    res.json(result.records[0].get('p'));
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to fetch product' });
+    res.status(500).json({ error: 'Failed to update product information' });
   }
 });
+
+
 
 
 app.listen(3002, function () {
