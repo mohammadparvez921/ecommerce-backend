@@ -241,6 +241,35 @@ app.put('/updateproduct/:productName', async (req, res) => {
 });
 
 
+// Filter products by category endpoint
+app.get('/searchproducts/:category', async (req, res) => {
+  const { category } = req.params;
+
+  try {
+    const session = driver.session();
+
+    // Filter products by category in Neo4j
+    const result = await session.run(
+      `
+      MATCH (p:Product {category: $category})
+      RETURN p
+      `,
+      { category }
+    );
+
+    session.close();
+
+    // Map the Neo4j result to JSON format
+    const products = result.records.map((record) => record.get('p'));
+
+    res.json(products);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+
 
 
 app.listen(3002, function () {
